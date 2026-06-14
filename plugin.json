@@ -1,0 +1,13 @@
+{
+  "name": "patent-flow-skill",
+  "version": "0.1.0",
+  "description": "Patent lifecycle management skill for OpenClaw",
+  "skill_file": "SKILL.md",
+  "feishu": {
+    "event_subscriptions": [
+      "im.message.receive_v1",
+      "im.chat.member.user.added_v3",
+      "card.action.trigger"
+    ]
+  }
+}

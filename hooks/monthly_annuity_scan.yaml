@@ -1,0 +1,4 @@
+name: monthly_annuity_scan
+schedule: "0 9 1 * *"
+description: Monthly scan for cases with annuity due within 90 days; generate PM maintenance decision cards
+run: python -m patent_flow scan-deadlines --days 90

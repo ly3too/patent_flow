@@ -1,0 +1,70 @@
+states:
+  S1_mining:
+    label: "S1 挖掘"
+    on_complete:
+      - S2_search
+    timeout: 7d
+    human_gate: ipr_confirm_three_elements
+
+  S2_search:
+    label: "S2 查新"
+    on_complete:
+      - S3_disclosure
+      - TERMINATED
+    timeout: 14d
+    human_gate: ipr_decide_continue
+
+  S3_disclosure:
+    label: "S3 交底"
+    on_complete:
+      - S4_filing
+    timeout: 14d
+    human_gate: ipr_review_disclosure
+
+  S4_filing:
+    label: "S4 委案"
+    on_complete:
+      - S5_review
+    auto: true
+    triggers:
+      - approval_passed
+
+  S5_review:
+    label: "S5 回稿"
+    on_complete:
+      - S6_priority_watch
+      - S7_oa
+    timeout: 30d
+    human_gate: ipr_scope_review
+
+  S6_priority_watch:
+    label: "S6 优先权监听"
+    on_complete:
+      - S7_oa
+    parallel_to:
+      - S7_oa
+    triggers:
+      - cron_monthly
+      - ten_month_due
+    human_gate: pm_priority_decision
+
+  S7_oa:
+    label: "S7 OA审查"
+    on_complete:
+      - S8_annuity
+    timeout: 90d
+    human_gate: ipr_finalize_response
+
+  S8_annuity:
+    label: "S8 授权年费"
+    on_complete:
+      - DONE
+    triggers:
+      - annuity_due
+    human_gate: pm_maintain_decision
+
+terminals:
+  DONE:
+    label: "已完成"
+  TERMINATED:
+    label: "已终止"
