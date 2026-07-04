@@ -1,4 +1,0 @@
-name: daily_oa_deadline
-schedule: "0 9 * * *"
-description: Scan for OA cases with deadline within 3 days and send reminders
-run: tools/scan_deadlines.sh 3

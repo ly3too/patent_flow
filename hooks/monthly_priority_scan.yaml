@@ -1,4 +1,0 @@
-name: monthly_priority_scan
-schedule: "0 9 1 * *"
-description: Monthly scan for cases approaching 10-month priority deadline; generate PM decision cards
-run: python -m patent_flow scan-deadlines --days 60
