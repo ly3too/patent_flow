@@ -43,19 +43,23 @@ workflow/patent-flow          ← 你在这里：读状态 + 路由决策
    └─ tool/patent-cli                （最底层：原子读写命令，被以上所有 task 调用）
 ```
 
-## 决策流程（design.md 图七）
+## 决策流程（design.md 图七，已落地为 patent_flow/workflow.py）
 
 ```
 飞书事件 / Cron / 卡片回调
-  → identify_case（群 ID 反查案号，一案一群 1:1 映射）
+  → identify_case（workflow.identify_case：群 ID 反查案号，一案一群 1:1 映射）
   → load_case（tool/patent-cli 的 load_case.sh：读主文档 + 最近 20 条事件）
-  → compose_prompt（注入状态 + 可用工具 + 硬规则）
-  → 路由到对应 task skill 做业务决策
-  → transition() 守卫（tool/patent-cli 的 transition.sh，状态机校验非法跳转）
-  → 合法：三处同步（主文档 + 台账 + 群公告/群名/播报）
-  → 非法：拒绝并报警
-  → 注册下一次唤醒（deadline）
+  → compose_prompt（LLM 侧：注入状态 + 可用工具 + 硬规则，从三要素/判定等结构化字段中提炼出 inputs）
+  → workflow.dispatch(case, **inputs)：registry.get_handler(当前节点) 拿到 task 层 handler 的 NodeResult，
+     若 to_node 非空立即用 state_machine.validate_transition() 校验一次（fail fast）
+  → tools/run_node.sh（= dispatch + apply_result 一次调用）：
+     合法且需要跳转 → transition() 四处同步（事件流水 + 主文档 agent:state + 台账 + 群公告/群名/播报）
+     非法跳转 → dispatch() 直接抛 ValueError，不会写任何东西
+     NodeResult.to_node 为 None（仍需人工/未到时间）→ 只回传 summary，不触发任何写操作
+  → 注册下一次唤醒（deadline，S6/S8 由 hooks/daily_deadline_scan.yaml 每日兜底）
 ```
+
+`patent_flow/workflow.py` 是这条流程的唯一实现：`dispatch()` 负责"路由 + 校验"，`apply_result()` 负责"要不要真的调 transition()"，`scan_deadlines()` 是 S6/S8 的 cron 入口。三者都不直接碰 `lark-cli`——都通过 `store.py` / `transition.py`。
 
 ## 节点 → task skill 路由表
 
@@ -86,7 +90,7 @@ workflow/patent-flow          ← 你在这里：读状态 + 路由决策
 
 ## 硬规则（不可绕过）
 
-1. **状态机是唯一真相**：无论 LLM 怎么"想", 都不能跳出 `patent_flow/state_machine.yaml` 定义的 `on_complete` 图。所有写操作必须走 [patent-cli](../../tool/patent-cli/SKILL.md) 的 `transition.sh`。
+1. **状态机是唯一真相**：无论 LLM 怎么"想", 都不能跳出 `patent_flow/state_machine.yaml` 定义的 `on_complete` 图。所有写操作必须走 [patent-cli](../../tool/patent-cli/SKILL.md) 的 `run_node.sh`（优先）或 `transition.sh`（例外场景）。
 2. **LLM 无状态**：每次唤醒都当新员工，把主文档（病历本）完整递给它，不依赖对话历史记忆。
 3. **三层各司其职**：workflow 只做路由和状态机守卫，业务细节在 task 层，飞书 API 调用细节在 tool 层——禁止跨层跳过（例如 workflow 直接拼 `lark-cli` 参数）。
 4. **一案一群**：群 ID ↔ 案号一一映射，不需要额外的 identify_case 逻辑，直接用群 ID 反查台账。

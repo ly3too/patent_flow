@@ -20,9 +20,11 @@ metadata:
 1. 对比代理所回稿与委案材料，生成形审 diff（新增/删除/修改的技术特征）
 2. 错别字检查、权利要求引用关系校验（引用的权利要求号是否存在、是否成环）
 3. 归档为 `05_代理稿_vN.docx`
-4. IPR 范围审查通过（`human_gate: ipr_scope_review`）后二选一：
-   - 默认：`transition.sh <案号> S6_priority_watch <依据>`（进入优先权监听，与 S7 并行等待）
-   - 若已直接收到审查意见：`transition.sh <案号> S7_oa <依据>`
+4. IPR 范围审查通过（`human_gate: ipr_scope_review`）后：
+   ```
+   tools/run_node.sh <案号> '{"diff_issues": [], "ipr_approved": true, "oa_already_received": false}'
+   ```
+   `patent_flow/nodes/s5_review.py` 据 `oa_already_received` 二选一跳转：默认 `False` → `S6_priority_watch`（与 S7 并行等待）；已直接收到审查意见则传 `true` → `S7_oa`。`diff_issues` 非空时不会跳转，返回问题清单等 IPR 处理。
 
 ## 超期处理
 

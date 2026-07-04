@@ -20,7 +20,7 @@ metadata:
 1. 归档 OA 通知书到 `07_OA通知书.pdf`
 2. 拉取审查意见引用的对比文件
 3. 生成反驳论点草稿（技术特征差异比对）
-4. IPR 定稿（`human_gate: ipr_finalize_response`）→ `transition.sh <案号> S8_annuity <依据>`
+4. IPR 定稿（`human_gate: ipr_finalize_response`）→ `tools/run_node.sh <案号> '{"rebuttal_ready": true, "ipr_finalized": true}'`（`patent_flow/nodes/s7_oa.py`：`rebuttal_ready=false` 或 `ipr_finalized=false` 都会停在原节点等待，只有两者都为 `true` 才跳转 `S8_annuity`）
 
 ## 超期处理
 

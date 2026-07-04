@@ -351,53 +351,85 @@ flowchart TD
 
 ## 八、跨宿主 Skill 包设计
 
-### 8.1 Skill 包结构（三端通用）
+### 8.1 三层 Skill 树（实际落地结构）
+
+> 与最初设想的"一个 SKILL.md 打天下"不同，实际落地把 Skill 拆成了**三层**，每一层都是独立的 `skills/<layer>/<name>/SKILL.md`，靠自己的 `description` 触发，靠 `metadata.requires.skills` 声明对下层的依赖：
 
 ```
-patent-flow-skill/                    ← 一个 git 仓库
-├── SKILL.md                          ← 唯一的"宿主入口"，三端都认
-├── plugin.json                       ← OpenClaw 元信息（Claude/Codex 忽略）
+workflow/patent-flow          ← 顶层：唯一编排入口，读状态 + 路由决策，不碰 lark-cli
+   │
+   ├─ task/patent-case-init          （新案件初始化）
+   ├─ task/patent-mining             （S1，人工确认三要素）
+   ├─ task/patent-search             （S2，唯一有 TERMINATED 分支）
+   ├─ task/patent-disclosure         （S3，格式/图号校验）
+   ├─ task/patent-filing             （S4，P1 全自动）
+   ├─ task/patent-review             （S5，形审 diff）
+   ├─ task/patent-priority-watch     （S6，P1 全自动，cron 驱动）
+   ├─ task/patent-oa                 （S7，两段式人工确认）
+   ├─ task/patent-grant-annuity      （S8，P1 全自动，cron 驱动）
+   ├─ task/patent-deadline-scan      （S6/S8 的每日 cron 扫描入口）
+   └─ task/patent-self-evolve        （对话式自我进化）
+        │
+        └─ tool/patent-cli           ← 底层：唯一原子命令层，被以上所有 task 调用
+```
+
+**分层职责边界（不可跨层跳过）**：
+- **workflow 层**（1 个）：`identify_case` → `load_case` → 按当前节点路由到对应 task skill → 校验状态机 → 触发同步。只做路由和守卫，不做具体业务判断。
+- **task 层**（11 个）：每个节点（或跨节点的期限扫描 / 自我进化）一个 skill，负责"这一步该收集什么信息、该问用户什么"，把结构化输入整理好后交给 tool 层执行。
+- **tool 层**（1 个）：只暴露原子命令（`load_case.sh` / `run_node.sh` / `transition.sh` / `append_event.sh` / `scan_deadlines.sh` / `meta/*`），不做任何业务判断。
+
+对应的仓库物理结构：
+
+```
+patent_flow/                          ← 一个 git 仓库（即本项目根目录）
+├── CLAUDE.md                         ← Claude Code 项目说明
+├── plugin.json                       ← OpenClaw 元信息，列出 13 个 skill 路径
 ├── pyproject.toml                    ← 纯 Python 包，可独立 pip install -e .
 │
-├── patent_flow/                      ← 核心业务（宿主无关）
-│   ├── state_machine.yaml
+├── patent_flow/                      ← 核心业务（宿主无关，被 skills/ 调用）
+│   ├── state_machine.yaml / state_machine.py   ← 状态机定义 + 守卫函数
 │   ├── store.py                      ← 飞书读写（Lark CLI 薄壳）
-│   ├── nodes/                        ← 8 个节点 handler
-│   ├── prompts/                      ← markdown 提示词
-│   └── cli.py                        ← python -m patent_flow <cmd>
+│   ├── transition.py                 ← 唯一的状态写入口
+│   ├── workflow.py                   ← 编排：identify_case / dispatch / apply_result / scan_deadlines
+│   ├── registry.py                   ← 节点名 → handler 映射
+│   ├── dates.py                      ← 到期日计算（无外部依赖）
+│   ├── cli.py                        ← python -m patent_flow <cmd>
+│   └── nodes/                        ← 8 个节点 handler（纯决策函数，返回 NodeResult）+ base.py
 │
-├── tools/                            ← 暴露给 LLM 的工具
-│   ├── load_case.sh
-│   ├── transition.sh
-│   ├── append_event.sh
-│   ├── scan_deadlines.sh
+├── skills/                           ← 三层 Skill 树，是本仓库对宿主的唯一入口
+│   ├── workflow/patent-flow/SKILL.md
+│   ├── task/patent-{case-init,mining,search,disclosure,filing,review,
+│   │              priority-watch,oa,grant-annuity,deadline-scan,self-evolve}/SKILL.md
+│   └── tool/patent-cli/SKILL.md
+│
+├── tools/                            ← skills/tool/patent-cli 背后的薄壳脚本
+│   ├── load_case.sh / run_node.sh / transition.sh / append_event.sh / scan_deadlines.sh
 │   └── meta/                         ← 自省工具（让 Agent 改自己）
-│       ├── list_skill_files.sh
-│       ├── read_skill_file.sh
-│       ├── propose_patch.sh
-│       ├── apply_patch.sh
-│       └── run_tests.sh
+│       ├── list_skill_files.sh / read_skill_file.sh
+│       └── propose_patch.sh / apply_patch.sh / run_tests.sh
 │
 ├── hooks/                            ← OpenClaw 用
-│   ├── monthly_priority_scan.yaml
-│   ├── monthly_annuity_scan.yaml
-│   └── daily_oa_deadline.yaml
+│   └── daily_deadline_scan.yaml      ← 唯一的每日 cron，S6/S8 各自的 REMIND_DAYS 天数档已含节奏
+│
+├── scripts/
+│   └── link_skills.sh                ← 把 skills/<layer>/<name>/ 逐个软链到两端宿主
 │
 └── tests/
-    ├── test_state_machine.py
-    ├── test_store.py
+    ├── test_state_machine.py / test_store.py / test_registry.py
+    ├── test_nodes.py / test_workflow.py
     └── test_e2e_dry_run.py
 ```
 
-### 8.2 三端加载方式
+### 8.2 两端实时加载方式
 
 | 宿主 | 加载命令 | 适合场景 |
 |---|---|---|
-| OpenClaw | `openclaw skills install ./patent-flow-skill` | **生产**：接飞书机器人，跑 hooks |
-| Claude Code | 软链到 `~/.claude/skills/` | **调试 / 改 Skill**：对话式迭代 |
-| Codex CLI | `codex skill add ./patent-flow-skill` | **重构 / 跑测试** |
+| Claude Code | `bash scripts/link_skills.sh` 软链到 `~/.claude/skills/<name>` | **调试 / 改 Skill**：对话式迭代，编辑即生效 |
+| OpenClaw | 同一脚本同时软链到 `~/.openclaw/skills/<name>` | **生产**：接飞书机器人，跑 `hooks/` |
 
-> **关键原则**：业务逻辑只暴露 CLI（`python -m patent_flow xxx`），工具脚本一律是薄壳。宿主差异收敛在 `SKILL.md` 的 frontmatter 和 `hooks/` 文件夹。
+`scripts/link_skills.sh` 是幂等的：遍历 `skills/*/*/` 下每个含 `SKILL.md` 的目录，按目录名（如 `patent-flow`、`patent-mining`）分别软链到两端宿主的 skills 目录，新增 skill 目录后重跑一次即可生效，无需 `openclaw skills install` 或重启。
+
+> **关键原则**：业务逻辑只暴露 CLI（`python -m patent_flow xxx`），工具脚本一律是薄壳；节点业务判断只暴露 `patent_flow.nodes.*.run()`，返回结构化的 `NodeResult` 而不是自己调用 `lark-cli`。宿主差异收敛在每个 `SKILL.md` 的 frontmatter 和 `hooks/` 文件夹，三层之间靠目录结构和 `metadata.requires.skills` 声明依赖，而不是靠一个巨大的顶层 `SKILL.md`。
 
 ---
 

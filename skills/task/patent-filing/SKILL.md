@@ -23,7 +23,7 @@ design.md 第十一节标注为 **P1 全自动**节点，建议最先落地—�
 1. 校验案号唯一性，写入台账主表
 2. 归档委案材料到案件文件夹
 3. 生成委案邮件草稿（收件人：外部代理所，走飞书邮件，代理所不入群）
-4. `transition.sh <案号> S5_review "委案邮件已发送"`
+4. `tools/run_node.sh <案号> '{}'` — `patent_flow/nodes/s4_filing.py` 不需要任何输入：校验案号格式、生成邮件草稿文本（`result.extra["filing_email_draft"]`）并直接跳转 `S5_review`，这是唯一一个"空 inputs 也能跑完"的节点
 
 ## 完成后
 

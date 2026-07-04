@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Scan bitable for cases with deadline within N days (default 3)
+# Scan bitable for S6/S8 cases due a reminder today (per-node REMIND_DAYS tiers).
 set -euo pipefail
 
-DAYS="${1:-3}"
-python -m patent_flow scan-deadlines --days "$DAYS"
+python -m patent_flow scan-deadlines

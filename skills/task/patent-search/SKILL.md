@@ -24,8 +24,12 @@ metadata:
 
 ## 关键分支（唯一有 TERMINATED 出口的节点）
 
-- 无新创性 → `transition.sh <案号> TERMINATED <依据>`
-- 有新创性 → `transition.sh <案号> S3_disclosure <依据>`
+```
+tools/run_node.sh <案号> '{"ipr_verdict": "无新创性", "evidence": "..."}'   # → TERMINATED
+tools/run_node.sh <案号> '{"ipr_verdict": "有新创性", "evidence": "..."}'   # → S3_disclosure
+```
+
+`patent_flow/nodes/s2_search.py` 的 `run()` 对 `ipr_verdict` 做枚举校验（只接受"有新创性"/"无新创性"），传其它值直接抛错，不会静默误判。
 
 ## 超期处理
 

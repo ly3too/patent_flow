@@ -1,0 +1,8 @@
+name: daily_deadline_scan
+schedule: "0 9 * * *"
+description: >
+  Daily cron wakeup for the two cron-driven nodes (S6 优先权监听, S8 授权年费).
+  Each node's own REMIND_DAYS tiers (patent_flow/nodes/s6_priority.py,
+  s8_annuity.py) decide whether today is actually a reminder day — this
+  hook just needs to run once daily so no exact-day tier is ever missed.
+run: python -m patent_flow scan-deadlines

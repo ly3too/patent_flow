@@ -20,7 +20,11 @@ metadata:
 1. 下发 `技术交底书` 模板到案件文件夹
 2. 研发填写后，校验格式完整性（章节齐全）与图号一致性（正文引用的图号与附图是否对应）
 3. 归档为 `03_技术交底书_vN.docx`
-4. IPR 审核通过（`human_gate: ipr_review_disclosure`）→ `transition.sh <案号> S4_filing <依据>`
+4. IPR 审核通过（`human_gate: ipr_review_disclosure`）→
+   ```
+   tools/run_node.sh <案号> '{"sections_present": ["技术领域","背景技术","发明内容","附图说明","具体实施方式"], "referenced_figures": [1,2,3], "provided_figures": [1,2,3], "ipr_approved": true}'
+   ```
+   `patent_flow/nodes/s3_disclosure.py` 会先做章节完整性和图号一致性校验（`check_figure_consistency`），任何一项不通过都会返回具体缺失/多余清单而不跳转到 S4，不需要人再手动检查一遍。
 
 ## 超期处理
 

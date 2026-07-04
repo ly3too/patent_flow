@@ -30,7 +30,11 @@ Bot: 已归档到 📁 01_挖掘/, AI 提炼出 3 个待澄清问题 ...
 2. 归档群内上传文件到云盘 `01_挖掘/`（走 lark-cli drive）
 3. 从会议纪要/技术说明中提炼「技术问题 / 技术方案 / 技术效果」草稿，写入主文档 `agent:elements` 区块
 4. 生成待澄清问题列表，@研发 或 @IPR 确认
-5. IPR 确认三要素完整后（`human_gate: ipr_confirm_three_elements`），调用 `transition.sh <案号> S2_search <依据>`
+5. IPR 确认三要素完整后（`human_gate: ipr_confirm_three_elements`），调用：
+   ```
+   tools/run_node.sh <案号> '{"three_elements": {"技术问题": "...", "技术方案": "...", "技术效果": "..."}, "ipr_confirmed": true, "clarifying_questions": []}'
+   ```
+   `patent_flow/nodes/s1_mining.py` 会先校验三要素三个字段是否都非空，缺失或未确认时返回 `needs_human` 而不跳转，不会误触发 `S2_search`。
 
 ## 超期处理
 
