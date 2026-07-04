@@ -1,0 +1,6 @@
+patent_flow_skill.egg-info/
+.pytest_cache/
+__pycache__/
+*.pyc
+.venv/
+.DS_Store

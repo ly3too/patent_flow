@@ -76,32 +76,37 @@ flowchart TB
 
 ### 4.1 存储拓扑
 
+> **收拢原则**：除飞书群（IM 侧对象，无法挂在文件树下）外，专利流程的一切存储——总台账、案件文件夹、模板——统一收拢在公司**知识库**下唯一的根节点 **`patent_flow/`** 之下，不再散落在租户顶层。新增/排查资源时只需认准这一个根节点。
+
 ```
-飞书租户
-│
-├── 📊 [顶层] 专利总台账.bitable        ← 全局索引 + 状态看板
-│      ├── 案件主表（主键：案号）
-│      ├── 事件流水（关联到主表）
-│      └── 待办/截止（过滤视图，仪表盘）
-│
-├── 📁 知识库/2026/
-│    ├── 📁 2026017CNU - 电视挂架自适应卡扣/
-│    │    ├── 📄 00_案件主文档.docx     ← Agent 的"病历本"，单一真相源
-│    │    ├── 📄 01_挖掘会议纪要.docx
-│    │    ├── 📄 02_查新报告.docx
-│    │    ├── 📄 03_技术交底书_v3.docx
-│    │    ├── 📄 04_委案邮件存档.docx
-│    │    ├── 📄 05_代理稿_v1.docx
-│    │    ├── 📄 07_OA通知书.pdf
-│    │    └── 📄 08_授权证书.pdf
-│    └── 📁 templates/
-│         └── 案件主文档模板.docx
-│
-└── 💬 群「[2026017CNU] 电视挂架自适应卡扣」  ← 运行时容器
-       ├── 群公告（状态镜像）
-       ├── Pin（主文档链接）
-       ├── 群文件（挂载到云盘目录）
-       └── 消息（Agent 决策上下文来源）
+公司知识库（飞书 Wiki）
+└── 📁 patent_flow/                          ← 专利流程总目录（唯一根节点，token 记为 $PATENT_FLOW_ROOT_TOKEN）
+     │
+     ├── 📊 专利总台账.bitable                ← 全局索引 + 状态看板
+     │      ├── 案件主表（主键：案号）
+     │      ├── 事件流水（关联到主表）
+     │      └── 待办/截止（过滤视图，仪表盘）
+     │
+     ├── 📁 templates/
+     │    └── 案件主文档模板.docx
+     │
+     └── 📁 cases/2026/
+          ├── 📁 2026017CNU - 电视挂架自适应卡扣/
+          │    ├── 📄 00_案件主文档.docx     ← Agent 的"病历本"，单一真相源
+          │    ├── 📄 01_挖掘会议纪要.docx
+          │    ├── 📄 02_查新报告.docx
+          │    ├── 📄 03_技术交底书_v3.docx
+          │    ├── 📄 04_委案邮件存档.docx
+          │    ├── 📄 05_代理稿_v1.docx
+          │    ├── 📄 07_OA通知书.pdf
+          │    └── 📄 08_授权证书.pdf
+          └── ...（其余案件同级）
+
+💬 群「[2026017CNU] 电视挂架自适应卡扣」  ← 运行时容器（IM 侧对象，独立于知识库文件树）
+   ├── 群公告（状态镜像）
+   ├── Pin（指向 patent_flow/cases/2026/2026017CNU.../00_案件主文档.docx）
+   ├── 群文件（挂载到 patent_flow/cases/2026/2026017CNU.../ 目录）
+   └── 消息（Agent 决策上下文来源）
 ```
 
 ### 4.2 顶层多维表格 schema
@@ -404,7 +409,8 @@ patent-flow-skill/                    ← 一个 git 仓库
 
 | 需求 | Lark CLI 子命令 |
 |---|---|
-| 建文档目录（云盘文件夹） | `lark-cli drive +folder-create --name "..." --parent-token <root>` |
+| 定位知识库根节点（一次性） | `lark-cli wiki +node-list --space-id <space_id>` 找到 `patent_flow` 节点，记下其 token 为 `$PATENT_FLOW_ROOT_TOKEN` |
+| 建文档目录（案件文件夹） | `lark-cli drive +folder-create --name "..." --parent-token $PATENT_FLOW_ROOT_TOKEN/cases/<year>` |
 | 建文档 | `lark-cli docs +create --doc-format xml --content @body.xml` |
 | 改文档内容 | `lark-cli docs +update --command str_replace / block_replace / append ...` |
 | 更新文档目录树 | `lark-cli drive +move / +rename` |
@@ -414,13 +420,15 @@ patent-flow-skill/                    ← 一个 git 仓库
 | 群文件管理 | `lark-cli im +file-upload` + `lark-cli drive +file-move` |
 | 多维表格读写 | `lark-cli base +record-create / +record-update / +query` |
 
+> `$PATENT_FLOW_ROOT_TOKEN` 只需在知识库里手动建一次 `patent_flow/` 根节点（含 `专利总台账.bitable`、`templates/`、`cases/` 三个子节点）后取一次 token，后续所有案件文件夹、模板、台账都挂在这一个 token 下面，不再新建平行的顶层资源。
+
 ### 9.2 一案一群初始化脚本
 
 ```bash
-# 1. 创建案件文件夹
+# 1. 创建案件文件夹（挂在知识库 patent_flow 根目录下的 cases/<year>/ 节点下）
 FOLDER_TOKEN=$(lark-cli drive +folder-create \
   --name "2026017CNU - 电视挂架自适应卡扣" \
-  --parent-token $PATENT_ROOT_FOLDER)
+  --parent-token "$PATENT_FLOW_ROOT_TOKEN/cases/2026")
 
 # 2. 从模板复制主文档
 DOC_TOKEN=$(lark-cli docs +copy \
@@ -581,7 +589,7 @@ Agent: [apply_patch] [run_tests → 12 passed]
 
 ## 十四、一句话总结
 
-> **OpenClaw 当机器人壳子 + 飞书官方插件做通信层 + Lark CLI 做飞书操作基础设施 + 自写 patent-flow-skill 做业务大脑；存储用"专利总台账"多维表格做索引、案件文件夹做归档、案件主文档做真相源；每个案件起一个飞书群作为运行时容器，群 ID ↔ 案号 一一映射，所有交互闭环在群里完成；Agent 唤醒时先读主文档解析状态块、灌进 prompt，决策后用 transition() 一次性同步主文档+台账+群公告+群名+播报；同一份 Skill 包通过 git 双分支在 Claude/Codex/OpenClaw 三端共用，配合 meta 自省工具让 Agent 在对话中安全地改自己。**
+> **OpenClaw 当机器人壳子 + 飞书官方插件做通信层 + Lark CLI 做飞书操作基础设施 + 自写 patent-flow-skill 做业务大脑；存储统一收拢在公司知识库 `patent_flow/` 根目录下：`专利总台账`多维表格做索引、`cases/` 案件文件夹做归档、案件主文档做真相源；每个案件起一个飞书群作为运行时容器，群 ID ↔ 案号 一一映射，所有交互闭环在群里完成；Agent 唤醒时先读主文档解析状态块、灌进 prompt，决策后用 transition() 一次性同步主文档+台账+群公告+群名+播报；同一份 Skill 包通过 git 双分支在 Claude/Codex/OpenClaw 三端共用，配合 meta 自省工具让 Agent 在对话中安全地改自己。**
 
 ---
 

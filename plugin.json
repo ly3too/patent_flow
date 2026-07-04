@@ -1,0 +1,27 @@
+{
+  "name": "patent-flow-skill",
+  "version": "0.1.0",
+  "description": "Patent lifecycle management skill for OpenClaw — 3-layer skill tree (workflow/task/tool)",
+  "skills": [
+    "skills/workflow/patent-flow",
+    "skills/task/patent-case-init",
+    "skills/task/patent-mining",
+    "skills/task/patent-search",
+    "skills/task/patent-disclosure",
+    "skills/task/patent-filing",
+    "skills/task/patent-review",
+    "skills/task/patent-priority-watch",
+    "skills/task/patent-oa",
+    "skills/task/patent-grant-annuity",
+    "skills/task/patent-deadline-scan",
+    "skills/task/patent-self-evolve",
+    "skills/tool/patent-cli"
+  ],
+  "feishu": {
+    "event_subscriptions": [
+      "im.message.receive_v1",
+      "im.chat.member.user.added_v3",
+      "card.action.trigger"
+    ]
+  }
+}
