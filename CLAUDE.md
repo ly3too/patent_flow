@@ -76,17 +76,20 @@ Nodes: `S1_mining → S2_search → S3_disclosure → S4_filing → S5_review �
 
 ### Storage Topology
 
-Everything except the group chat lives under one root node in the company's Feishu knowledge base: `patent_flow/` (token kept as `$PATENT_FLOW_ROOT_TOKEN`). Nothing patent-related should be created as a parallel top-level resource outside this node.
+Everything except the group chat lives inside one Feishu Wiki space: `patent_flow` itself is the root (`$PATENT_FLOW_ROOT_TOKEN` = that space's `space_id`), not a node nested under some other space. Nothing patent-related should be created as a parallel top-level resource outside this space, and — this was a real bug found during the first live case-init run — nothing should end up in anyone's personal Drive ("我的空间") either; every write needs an explicit wiki space/parent-node target.
+
+**Wiki nodes have no `folder` obj_type** (`doc/sheet/bitable/mindnote/docx/file/slides` only — verified against the real API, not assumed). "Directories" are simulated with plain `docx` nodes used purely as parents (e.g. a `cases` node, a `cases/2026` node under it); a case's main document is itself the leaf node, not a separate file inside a folder. Existing Drive documents get moved in with `wiki +move --obj-type docx --obj-token <token> --target-space-id <space_id> --target-parent-token <parent_node_token>` rather than recreated. Per-case binary attachments (scanned PDFs, etc.) attach directly to that case's node via `drive +upload --wiki-token <node_token>`.
 
 ```
-公司知识库（飞书 Wiki）
-└── patent_flow/                     ← single root node, $PATENT_FLOW_ROOT_TOKEN
-     ├── 专利总台账.bitable          ← global index + status board (3 tables: 案件主表, 事件流水, 待办截止)
-     ├── templates/                  ← 案件主文档模板.docx
-     └── cases/YYYY/<案号>/          ← per-case folder with numbered documents
-          └── 00_案件主文档.docx     ← single source of truth; Agent reads/writes agent:state / agent:elements / agent:log HTML comment blocks
+patent_flow (Wiki space, IS the root — $PATENT_FLOW_ROOT_TOKEN = space_id)
+├── 专利总台账.bitable          ← global index + status board (3 tables: 案件主表, 事件流水, 待办截止)
+├── templates (docx node, parent-only placeholder)
+│    └── 案件主文档模板.docx (child node)
+└── cases (docx node, parent-only placeholder)
+     └── YYYY (docx node, parent-only placeholder)
+          └── <案号> - <案件名>     ← the case's own node IS 00_案件主文档; Agent reads/writes agent:state / agent:elements / agent:log HTML comment blocks
 
-群「[案号] 案件名 - 节点」            ← runtime container (IM object, not part of the Drive/Wiki tree); chat ID ↔ case number is 1-to-1
+群「[案号] 案件名 - 节点」            ← runtime container (IM object, not part of the wiki tree); chat ID ↔ case number is 1-to-1
 ```
 
 The master document uses HTML comment delimiters (`<!-- agent:state:begin -->` … `<!-- agent:state:end -->`) so humans and the Agent can co-edit the same doc without conflicts.

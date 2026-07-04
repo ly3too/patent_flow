@@ -76,36 +76,29 @@ flowchart TB
 
 ### 4.1 存储拓扑
 
-> **收拢原则**：除飞书群（IM 侧对象，无法挂在文件树下）外，专利流程的一切存储——总台账、案件文件夹、模板——统一收拢在公司**知识库**下唯一的根节点 **`patent_flow/`** 之下，不再散落在租户顶层。新增/排查资源时只需认准这一个根节点。
+> **收拢原则**：除飞书群（IM 侧对象，无法挂在文件树下）外，专利流程的一切存储——总台账、案件文件夹、模板——统一收拢在公司**知识库**下唯一的 Wiki 空间 **`patent_flow`**（本身就是这个空间，不是某个空间下的子节点）之下，不再散落在租户顶层，**也不落在任何个人云空间/我的空间**。新增/排查资源时只需认准这一个空间。
+
+> **平台限制（调试时验证过）**：Wiki 节点没有 `folder` 这个 obj_type——`wiki nodes create` / `wiki +move (docs_to_wiki)` 支持的 obj_type 只有 `doc / sheet / bitable / mindnote / docx / file / slides`，都是"单个文档对象"，不能建出能装任意文件的文件夹容器。因此"目录"用**嵌套的 docx 节点**模拟（`cases`、`cases/2026` 都是标题为该名字的 docx 节点，本身没有正文内容，只作为父节点存在）；已有的 Drive 文档用 `wiki +move --obj-type docx --obj-token <token> --target-space-id <space_id> --target-parent-token <父节点token>` 迁入对应节点下，而不是重新建一份。一个案件不再需要单独的"案件文件夹"——案件主文档本身就是那个案件在 wiki 里的节点；如果确实需要挂多个二进制附件（如 PDF 扫描件），用 `drive +upload --wiki-token <该案件节点token>` 直接挂到这个节点下，不用另建文件夹。
 
 ```
-公司知识库（飞书 Wiki）
-└── 📁 patent_flow/                          ← 专利流程总目录（唯一根节点，token 记为 $PATENT_FLOW_ROOT_TOKEN）
+公司知识库 Wiki 空间：patent_flow                ← 本身即根节点，token 记为 $PATENT_FLOW_ROOT_TOKEN（= space_id）
      │
      ├── 📊 专利总台账.bitable                ← 全局索引 + 状态看板
      │      ├── 案件主表（主键：案号）
      │      ├── 事件流水（关联到主表）
      │      └── 待办/截止（过滤视图，仪表盘）
      │
-     ├── 📁 templates/
-     │    └── 案件主文档模板.docx
+     ├── 📄 templates（docx 节点，仅作父节点占位）
+     │    └── 案件主文档模板.docx（子节点）
      │
-     └── 📁 cases/2026/
-          ├── 📁 2026017CNU - 电视挂架自适应卡扣/
-          │    ├── 📄 00_案件主文档.docx     ← Agent 的"病历本"，单一真相源
-          │    ├── 📄 01_挖掘会议纪要.docx
-          │    ├── 📄 02_查新报告.docx
-          │    ├── 📄 03_技术交底书_v3.docx
-          │    ├── 📄 04_委案邮件存档.docx
-          │    ├── 📄 05_代理稿_v1.docx
-          │    ├── 📄 07_OA通知书.pdf
-          │    └── 📄 08_授权证书.pdf
-          └── ...（其余案件同级）
+     └── 📄 cases（docx 节点，仅作父节点占位）
+          └── 📄 2026（docx 节点，仅作父节点占位）
+               ├── 📄 2026017CNU - 电视挂架自适应卡扣   ← 案件主文档本身，Agent 的"病历本"，单一真相源
+               └── ...（其余案件同级）
 
-💬 群「[2026017CNU] 电视挂架自适应卡扣」  ← 运行时容器（IM 侧对象，独立于知识库文件树）
-   ├── 群公告（状态镜像）
-   ├── Pin（指向 patent_flow/cases/2026/2026017CNU.../00_案件主文档.docx）
-   ├── 群文件（挂载到 patent_flow/cases/2026/2026017CNU.../ 目录）
+💬 群「[2026017CNU] 电视挂架自适应卡扣」  ← 运行时容器（IM 侧对象，独立于知识库树）
+   ├── 群公告（状态镜像；若应用未在开发者后台开通 im:chat.announcement scope，暂用 Pin 消息替代）
+   ├── Pin（指向 cases/2026/2026017CNU.../ 这个案件节点）
    └── 消息（Agent 决策上下文来源）
 ```
 
@@ -253,8 +246,8 @@ def transition(case_no, to_node, evidence):
 | 元素 | 规范 | 由谁维护 |
 |---|---|---|
 | 群名 | `[2026017CNU] 电视挂架自适应卡扣 - S2查新中` | Agent 自动更新 |
-| 群公告 | 当前节点 / 状态 / 截止 / 主文档链接 / 常用命令 | Agent 自动更新 |
-| Pin 消息 | 主文档链接 + 当前节点说明 | Agent |
+| 群公告 | 当前节点 / 状态 / 截止 / 主文档链接 / 常用命令 | Agent 自动更新（**前提**：应用需在飞书开放平台后台勾选 `im:chat.announcement:read`/`write`；首次调试时发现这两个 scope 若未在后台申请，`auth login` 无论怎么重新走用户授权都会报"invalid or malformed scopes"——这是应用级权限缺失，不是用户没登录。scope 到位前，用「Pin 消息」替代群公告） |
+| Pin 消息 | 主文档链接 + 当前节点说明；scope 未就绪时兼任群公告的替代方案 | Agent |
 | 群文件目录 | 01_挖掘 / 02_查新 / 03_交底书 / ... / 08_授权 | Agent 自动建 |
 | 成员 | IPR(管理员) + 研发 + PM + leader(按需) | IPR 初始化，Agent 维护 |
 | 外部代理所 | **不入群**，走邮件 | — |
@@ -436,6 +429,8 @@ patent_flow/                          ← 一个 git 仓库（即本项目根目
 ## 九、Lark CLI 作为基础设施层
 
 飞书官方 2026.3.28 开源的 Lark CLI（MIT 协议），覆盖 2500+ API、11 个业务领域、19 个 AI Agent Skills，所有飞书操作一行命令搞定。
+
+> **本节以下的命令是设计阶段的伪代码，未必是实际安装版本的真实参数。** 首次跑通 case-init 调试时对照实际安装的 lark-cli（1.0.53）核实过一遍：`base +record-create`/`+record-update`/`+query` 都不存在，真实命令是 `+record-upsert`（不传 `--record-id` 即创建）配合 `+record-list --filter-json`；`drive +folder-create` 应为 `+create-folder`；`im +send` 应为 `+messages-send --chat-id`（不是 `--receive-id`）；`im +chat-update` 不支持 `--announcement`。这些差异已在 `patent_flow/store.py` 里改正；伪代码保留是为了说明设计意图，不代表可以照抄执行。
 
 ### 9.1 能力对照
 
