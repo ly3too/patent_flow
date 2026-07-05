@@ -111,7 +111,7 @@ flowchart TB
 | 案号 | 单行文本 主键 | 2026017CNU |
 | 群 ID | 单行文本 | 一案一群的群唯一标识，反查入口 |
 | 案件文件夹 | 链接 | 云盘目录 |
-| 案件主文档 | 链接 | 00_案件主文档.docx |
+| 案件主文档 | 链接 | 案件在 wiki 里的节点本身，标题即「案号 - 案件名」，如 `2026017CNU - 电视挂架自适应卡扣` |
 | 当前节点 | 单选 | S1/S2/.../S8/DONE/TERMINATED |
 | 当前子步骤 | 单行文本 | S6.2 等待 PM 决策 |
 | 状态 | 单选 | running / waiting_human / blocked / done |
@@ -457,11 +457,11 @@ FOLDER_TOKEN=$(lark-cli drive +folder-create \
   --name "2026017CNU - 电视挂架自适应卡扣" \
   --parent-token "$PATENT_FLOW_ROOT_TOKEN/cases/2026")
 
-# 2. 从模板复制主文档
+# 2. 从模板复制主文档（标题用「案号 - 案件名」，不要用固定的"00_案件主文档"）
 DOC_TOKEN=$(lark-cli docs +copy \
   --source-token $TEMPLATE_DOC_TOKEN \
   --target-folder $FOLDER_TOKEN \
-  --name "00_案件主文档")
+  --name "2026017CNU - 电视挂架自适应卡扣")
 
 # 3. 创建一案一群
 CHAT_ID=$(lark-cli im +chat-create \

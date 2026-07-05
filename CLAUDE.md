@@ -87,7 +87,7 @@ patent_flow (Wiki space, IS the root — $PATENT_FLOW_ROOT_TOKEN = space_id)
 │    └── 案件主文档模板.docx (child node)
 └── cases (docx node, parent-only placeholder)
      └── YYYY (docx node, parent-only placeholder)
-          └── <案号> - <案件名>     ← the case's own node IS 00_案件主文档; Agent reads/writes agent:state / agent:elements / agent:log HTML comment blocks
+          └── <案号> - <案件名>     ← the case's own node IS the main document (titled "<案号> - <案件名>", never a fixed "00_案件主文档"); Agent reads/writes agent:state / agent:elements / agent:log HTML comment blocks
 
 群「[案号] 案件名 - 节点」            ← runtime container (IM object, not part of the wiki tree); chat ID ↔ case number is 1-to-1
 ```
