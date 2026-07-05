@@ -96,9 +96,9 @@ flowchart TB
                ├── 📄 2026017CNU - 电视挂架自适应卡扣   ← 案件主文档本身，Agent 的"病历本"，单一真相源
                └── ...（其余案件同级）
 
-💬 群「[2026017CNU] 电视挂架自适应卡扣」  ← 运行时容器（IM 侧对象，独立于知识库树）
-   ├── 群公告（状态镜像；若应用未在开发者后台开通 im:chat.announcement scope，暂用 Pin 消息替代）
-   ├── Pin（指向 cases/2026/2026017CNU.../ 这个案件节点）
+💬 群「[2026017CNU] 电视挂架自适应卡扣」  ← 运行时容器（IM 侧对象，独立于知识库树；群内一切操作以 bot 身份进行，见 §9.1 末尾）
+   ├── 群公告（状态镜像，`LarkIM.set_announcement()` 维护；应用未开通 im:chat.announcement scope 时自动降级为 Pin 消息）
+   ├── Pin（指向 cases/2026/2026017CNU.../ 这个案件节点；不管群公告是否可用都会发）
    └── 消息（Agent 决策上下文来源）
 ```
 
@@ -247,12 +247,14 @@ def transition(case_no, to_node, evidence):
 
 | 元素 | 规范 | 由谁维护 |
 |---|---|---|
-| 群名 | `[2026017CNU] 电视挂架自适应卡扣 - S2查新中` | Agent 自动更新 |
-| 群公告 | 当前节点 / 状态 / 截止 / 主文档链接 / 常用命令 | Agent 自动更新（**前提**：应用需在飞书开放平台后台勾选 `im:chat.announcement:read`/`write`；首次调试时发现这两个 scope 若未在后台申请，`auth login` 无论怎么重新走用户授权都会报"invalid or malformed scopes"——这是应用级权限缺失，不是用户没登录。scope 到位前，用「Pin 消息」替代群公告） |
-| Pin 消息 | 主文档链接 + 当前节点说明；scope 未就绪时兼任群公告的替代方案 | Agent |
+| 群名 | `[2026017CNU] 电视挂架自适应卡扣 - S2查新中` | Agent（bot 身份）自动更新 |
+| 群公告 | 当前节点 / 状态 / 截止 / 主文档链接 / 常用命令 | Agent（bot 身份）自动更新，`patent_flow.store.LarkIM.set_announcement()` 实现（**前提**：应用需在飞书开放平台后台勾选 `im:chat.announcement:read`/`write_only`——注意是 `write_only` 不是 `write`，请求错名字会报 `invalid or malformed scopes`；这是应用级权限缺失，不是用户没登录。scope 未就绪时自动降级为「Pin 消息」，见 `patent_flow.transition._set_announcement_with_fallback()`） |
+| Pin 消息 | 主文档链接 + 当前节点说明；无论群公告是否可用都会发 | Agent（bot 身份） |
 | 群文件目录 | 01_挖掘 / 02_查新 / 03_交底书 / ... / 08_授权 | Agent 自动建 |
-| 成员 | IPR(管理员) + 研发 + PM + leader(按需) | IPR 初始化，Agent 维护 |
+| 成员 | IPR(管理员) + 研发 + PM + leader(按需) + lark-cli 绑定的应用 bot + OpenClaw 的应用 bot（两者可能不是同一个应用，都要拉） | IPR 初始化，Agent 维护 |
 | 外部代理所 | **不入群**，走邮件 | — |
+
+> **消息发送身份**：建群（需要一步邀请人类成员）用 `--as user`；建群之后的改名、群公告、Pin、播报消息等一切群内操作都用 `--as bot`——Agent 是以机器人身份活动，不冒充 IPR 本人说话。
 
 ### 6.3 典型交互场景
 
@@ -432,7 +434,9 @@ patent_flow/                          ← 一个 git 仓库（即本项目根目
 
 飞书官方 2026.3.28 开源的 Lark CLI（MIT 协议），覆盖 2500+ API、11 个业务领域、19 个 AI Agent Skills，所有飞书操作一行命令搞定。
 
-> **本节以下的命令是设计阶段的伪代码，未必是实际安装版本的真实参数。** 首次跑通 case-init 调试时对照实际安装的 lark-cli（1.0.53）核实过一遍：`base +record-create`/`+record-update`/`+query` 都不存在，真实命令是 `+record-upsert`（不传 `--record-id` 即创建）配合 `+record-list --filter-json`；`drive +folder-create` 应为 `+create-folder`；`im +send` 应为 `+messages-send --chat-id`（不是 `--receive-id`）；`im +chat-update` 不支持 `--announcement`。这些差异已在 `patent_flow/store.py` 里改正；伪代码保留是为了说明设计意图，不代表可以照抄执行。
+> **本节以下的命令是设计阶段的伪代码，未必是实际安装版本的真实参数。** 首次跑通 case-init 调试时对照实际安装的 lark-cli（1.0.53）核实过一遍：`base +record-create`/`+record-update`/`+query` 都不存在，真实命令是 `+record-upsert`（不传 `--record-id` 即创建）配合 `+record-list --filter-json`；`drive +folder-create` 应为 `+create-folder`；`im +send` 应为 `+messages-send --chat-id`（不是 `--receive-id`）；`im +chat-update` 不支持 `--announcement`（这个 flag 根本不存在，`+chat-update` 只能改名字/描述）。这些差异已在 `patent_flow/store.py` 里改正；伪代码保留是为了说明设计意图，不代表可以照抄执行。
+>
+> **群公告的真实实现**：不是 `im +chat-update --announcement`，而是"升级版群公告"的 docx block API——根 block_id 就是 chat_id 本身：`GET/POST/DELETE /open-apis/docx/v1/chats/:chat_id/announcement/blocks/:chat_id/children[/batch_delete]`。`create children` 只会追加，"替换公告"要先读现有块数、非空则先 `batch_delete` 再 `POST` 新内容。需要应用在开发者后台勾选 `im:chat.announcement:read` + `im:chat.announcement:write_only`（注意是 `write_only`，请求 `write` 会被拒）。已封装为 `patent_flow.store.LarkIM.set_announcement()`，scope 未就绪时 `patent_flow.transition._set_announcement_with_fallback()` 自动降级为 Pin 消息。
 
 ### 9.1 能力对照
 

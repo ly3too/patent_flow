@@ -119,21 +119,69 @@ class BitableStore:
 
 
 class LarkIM:
-    def send(self, chat_id: str, text: str) -> None:
-        _run([
+    """All group-facing actions run `--as bot` — the Agent posts as the app's
+    own bot identity, not by impersonating the human IPR who happens to be
+    logged in (that's what `--as user` is for, and it's reserved for
+    resource-creation steps like `+chat-create` that need to invite humans
+    in one step)."""
+
+    def send(self, chat_id: str, text: str) -> str:
+        """Returns the sent message's `message_id`, e.g. for `pin()`."""
+        out = _run([
             "im", "+messages-send",
+            "--as", "bot",
             "--chat-id", chat_id,
             "--text", text,
         ])
+        return json.loads(out)["data"]["message_id"]
 
-    def update_chat(self, chat_id: str, name: str | None = None,
-                    announcement: str | None = None) -> None:
-        """`announcement` needs `im:chat.announcement:read/write` scopes and
-        a block-diff body (same shape as `docs +update`) — the CLI has no
-        shortcut for it yet, so it's out of scope for this thin wrapper.
-        Name/description go through `+chat-update`."""
+    def pin(self, chat_id: str, message_id: str) -> None:
+        _run(["im", "pins", "create", "--as", "bot", "--data", json.dumps({"message_id": message_id})])
+
+    def update_chat(self, chat_id: str, name: str | None = None) -> None:
         if name:
-            _run(["im", "+chat-update", "--chat-id", chat_id, "--name", name])
+            _run(["im", "+chat-update", "--as", "bot", "--chat-id", chat_id, "--name", name])
+
+    def set_announcement(self, chat_id: str, text: str) -> None:
+        """Replace the chat's 群公告 with a single text block.
+
+        There's no lark-cli shortcut for this (verified: no schema entry
+        exists for the announcement resource at all), and the *legacy*
+        `GET/PATCH /open-apis/im/v1/chats/:chat_id/announcement` fails with
+        `232097 Unable to operate docx type chat announcement` for chats
+        whose announcement has been upgraded to the newer docx-block model
+        (which appears to be the default now). The real path is the
+        `docx/v1` "upgraded group announcement" API, block-based like a docx
+        document — its root block token is the `chat_id` itself:
+          - read:   GET    /open-apis/docx/v1/chats/:chat_id/announcement/blocks/:chat_id/children
+          - clear:  DELETE /open-apis/docx/v1/chats/:chat_id/announcement/blocks/:chat_id/children/batch_delete
+          - write:  POST   /open-apis/docx/v1/chats/:chat_id/announcement/blocks/:chat_id/children
+        `create children` only *appends*, so clear-then-append is how you
+        "replace" it. Needs `im:chat.announcement:read` +
+        `im:chat.announcement:write_only` enabled for the app in the Feishu
+        console — if that raises, callers should fall back to a pinned
+        status message (see skills/task/patent-case-init/SKILL.md).
+        """
+        base = f"/open-apis/docx/v1/chats/{chat_id}/announcement/blocks/{chat_id}/children"
+
+        existing = json.loads(_run(["api", "GET", base, "--as", "bot"]))
+        count = len(existing.get("data", {}).get("items", []))
+        if count:
+            _run([
+                "api", "DELETE", f"{base}/batch_delete",
+                "--as", "bot",
+                "--data", json.dumps({"start_index": 0, "end_index": count}),
+            ])
+
+        _run([
+            "api", "POST", base,
+            "--as", "bot",
+            "--data", json.dumps({
+                "children": [
+                    {"block_type": 2, "text": {"elements": [{"text_run": {"content": text}}]}},
+                ],
+            }, ensure_ascii=False),
+        ])
 
 
 class LarkDoc:

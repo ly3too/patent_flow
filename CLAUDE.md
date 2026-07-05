@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `patent-flow-skill` is a cross-host AI Agent skill package for automating the full lifecycle of patent applications (挖掘→查新→交底→委案→回稿→优先权→OA→授权年费). It runs on OpenClaw (production) and Claude Code (debugging/development), sharing one codebase across both hosts via live-linked skills.
 
-Storage is entirely within Feishu (Lark): a top-level multi-dimensional table as the global index, per-case document folders in the knowledge base, and one Feishu group chat per patent case as the runtime container. Full design rationale: [design.md](design.md).
+Storage is entirely within Feishu (Lark): a top-level multi-dimensional table as the global index, per-case document folders in the knowledge base, and one Feishu group chat per patent case as the runtime container. Full design rationale: [design.md](design.md). First-time setup: [README.md](README.md) / `scripts/install.sh`.
 
 ## Three-layer skill architecture
 
@@ -26,10 +26,11 @@ Each skill directory has its own `SKILL.md` (frontmatter + instructions), follow
 
 ## Commands
 
-System Python is 3.9 (too old). Use the Codex runtime Python:
+System Python is 3.9 (too old — patent_flow uses 3.10+ syntax like `str | None`). `scripts/install.sh` finds a compatible interpreter and writes it to `.env.patent_flow` as `$PYTHON`; `source .env.patent_flow` once per shell and everything below just works. On this machine specifically, that resolves to the Codex runtime Python:
 
 ```bash
-export PYTHON=/Users/ly3too/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12
+source .env.patent_flow   # sets $PYTHON, $LEDGER_APP_TOKEN, $LEDGER_MAIN_TABLE, etc.
+# (on this machine, $PYTHON = /Users/ly3too/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3.12)
 
 # Install dependencies
 $PYTHON -m pip install -e ".[dev]"
@@ -58,9 +59,11 @@ $PYTHON -m patent_flow <cmd>
 # Re-link dev skills into Claude Code + OpenClaw
 bash scripts/link_skills.sh
 
-# Install Lark CLI (Feishu API infrastructure) and authenticate
-npm install -g @larksuiteoapi/lark-cli
-lark-cli auth login --app-id cli_xxx --app-secret xxx
+# Re-bootstrap the Feishu knowledge-base infra (idempotent — safe to re-run)
+bash scripts/setup_feishu_infra.sh
+
+# Full one-click setup from scratch (lark-cli install, app auth, infra, deps, skills, tests)
+bash scripts/install.sh
 ```
 
 ## Architecture
@@ -71,7 +74,7 @@ Business logic lives only in `patent_flow/` (the core package) plus the `skills/
 
 ### State Machine (`patent_flow/state_machine.yaml`)
 
-The 8-node pipeline is **YAML-defined with Python guard functions** — the LLM cannot skip nodes or make illegal transitions. All state writes go through a single `transition()` function that atomically syncs four places: the case master document (`agent:state` block) → the Bitable master table → the group chat announcement + name → a broadcast message.
+The 8-node pipeline is **YAML-defined with Python guard functions** — the LLM cannot skip nodes or make illegal transitions. All state writes go through a single `transition()` function that atomically syncs four places: the case master document (`agent:state` block) → the Bitable master table → the group chat announcement + name → a broadcast message. Everything past chat *creation* (`+chat-create`, which needs `--as user` to invite humans in one step) runs `--as bot` — `patent_flow/store.py`'s `LarkIM` posts as the app's own bot identity, never impersonating the human. `LarkIM.set_announcement()` implements the real 群公告 API (the "upgraded"/docx-block one — `docx/v1/chats/:chat_id/announcement/blocks/:chat_id/children`, not the legacy `im/v1` one, which 232097s on chats with a docx-type announcement); if the app hasn't been granted `im:chat.announcement:read`/`write_only` in the Feishu console, `transition._set_announcement_with_fallback()` degrades to a pinned status message instead of failing.
 
 Nodes: `S1_mining → S2_search → S3_disclosure → S4_filing → S5_review → S6_priority_watch → S7_oa → S8_annuity → DONE` (with `TERMINATED` exit from S2). Node business logic lives in `patent_flow/nodes/`, one module per node — each corresponds 1:1 to a `skills/task/patent-*` skill. Handlers are pure decision functions: `run(case, **inputs) -> NodeResult` (`patent_flow/nodes/base.py`). They never touch `lark-cli` or call `transition()` directly; `to_node=None` means "stay put, still waiting on a human_gate or a deadline that hasn't hit yet."
 

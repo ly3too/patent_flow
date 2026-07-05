@@ -3,4 +3,7 @@
 # retried against the live ledger on collision.
 set -euo pipefail
 
-python -m patent_flow new-case-no
+ENV_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env.patent_flow"
+[[ -f "$ENV_FILE" ]] && source "$ENV_FILE"
+
+"${PYTHON:-python3}" -m patent_flow new-case-no

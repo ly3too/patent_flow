@@ -3,6 +3,9 @@
 # Returns case state JSON from bitable + agent:state block from master doc
 set -euo pipefail
 
+ENV_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env.patent_flow"
+[[ -f "$ENV_FILE" ]] && source "$ENV_FILE"
+
 CASE_NO="${1:?Usage: load_case.sh <case_no>}"
 
 lark-cli base +record-list \

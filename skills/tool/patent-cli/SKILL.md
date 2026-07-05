@@ -56,4 +56,4 @@ metadata:
 1. **唯一写入口**：任何状态变更必须走 `run_node.sh` 或 `transition.sh`，两者最终都落到 `patent_flow.transition.transition()`，内部调用 `state_machine.validate_transition()` 做守卫校验，非法跳转直接抛错（`dispatch()` 在拿到节点 handler 的决策后也会先校验一次，双重保险）。
 2. **先写事件流水，后写主表/群**：保证审计可追溯，即使后续步骤失败也不会丢事件。
 3. `apply_patch.sh` 只能在 `dev` 分支运行；测试失败自动 `git reset --hard HEAD`。
-4. 环境变量 `LEDGER_APP_TOKEN` / `LEDGER_MAIN_TABLE` / `LEDGER_EVENTS_TABLE` 必须在调用前配置好（参考 [lark-shared](../../../../../.agents/skills/lark-shared/SKILL.md) 做 `lark-cli auth login`）。
+4. 环境变量 `LEDGER_APP_TOKEN` / `LEDGER_MAIN_TABLE` / `LEDGER_EVENTS_TABLE`（以及 `run_node.sh`/`transition.sh`/`scan_deadlines.sh`/`new_case_no.sh` 用的 `$PYTHON`）必须在调用前配置好——所有 `tools/*.sh` 会自动 `source` 仓库根目录的 `.env.patent_flow`（由 `scripts/install.sh` / `scripts/setup_feishu_infra.sh` 生成），不需要每次手动 `export`；第一次跑还没有这个文件时先看 [README.md](../../../README.md) 跑一遍 `scripts/install.sh`。

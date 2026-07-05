@@ -2,6 +2,9 @@
 # Usage: append_event.sh <case_no> <source> <event_type> <summary>
 set -euo pipefail
 
+ENV_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/.env.patent_flow"
+[[ -f "$ENV_FILE" ]] && source "$ENV_FILE"
+
 CASE_NO="${1:?}" SOURCE="${2:?}" EVENT_TYPE="${3:?}" SUMMARY="${4:?}"
 
 lark-cli base +record-upsert \

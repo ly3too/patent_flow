@@ -1,5 +1,6 @@
 """Atomic state transition — the only path for any state write."""
 import os
+import subprocess
 from .state_machine import validate_transition
 from .store import BitableStore, LarkIM, LarkDoc
 
@@ -44,8 +45,22 @@ def transition(
     # 4. sync group chat name + announcement + broadcast
     new_name = f"[{case_no}] {case_title} - {to_node}"
     announcement = _render_announcement(case_no, to_node)
-    im.update_chat(chat_id, name=new_name, announcement=announcement)
+    im.update_chat(chat_id, name=new_name)
+    _set_announcement_with_fallback(im, chat_id, announcement)
     im.send(chat_id, f"🔄 节点跳转 {from_node} → {to_node}\n依据：{evidence}")
+
+
+def _set_announcement_with_fallback(im: LarkIM, chat_id: str, announcement: str) -> None:
+    """群公告 needs `im:chat.announcement:read`/`write_only` enabled for the
+    app in the Feishu console (not something `auth login` alone can grant —
+    see store.py's `LarkIM.set_announcement` docstring). If that's missing,
+    degrade to a pinned status message instead of failing the whole
+    transition."""
+    try:
+        im.set_announcement(chat_id, announcement)
+    except subprocess.CalledProcessError:
+        message_id = im.send(chat_id, announcement)
+        im.pin(chat_id, message_id)
 
 
 def _render_state_xml(case_no: str, node: str) -> str:

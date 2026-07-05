@@ -99,18 +99,60 @@ def test_list_cases_by_node_returns_fields_only():
     assert [c["案号"] for c in cases] == ["A", "B"]
 
 
-def test_lark_im_send_uses_chat_id_flag():
+def test_lark_im_send_uses_chat_id_flag_and_bot_identity():
     calls = []
 
     def fake_run(args, **kwargs):
         calls.append(args)
         m = MagicMock()
-        m.stdout = "{}"
+        m.stdout = json.dumps({"data": {"message_id": "om_xxx"}})
         return m
 
     with patch("subprocess.run", side_effect=fake_run):
-        LarkIM().send("oc_xxx", "hello")
+        message_id = LarkIM().send("oc_xxx", "hello")
 
     joined = " ".join(calls[0])
     assert "--chat-id" in joined and "oc_xxx" in joined
     assert "--receive-id" not in joined
+    assert "--as bot" in joined
+    assert message_id == "om_xxx"
+
+
+def test_lark_im_set_announcement_clears_existing_then_creates():
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        m = MagicMock()
+        if args[1:3] == ["api", "GET"]:
+            m.stdout = json.dumps({"data": {"items": [{"block_id": "b1"}]}})
+        else:
+            m.stdout = "{}"
+        return m
+
+    with patch("subprocess.run", side_effect=fake_run):
+        LarkIM().set_announcement("oc_xxx", "状态更新")
+
+    methods = [(c[1], c[2]) for c in calls]
+    assert ("api", "GET") in methods
+    assert ("api", "DELETE") in methods
+    assert ("api", "POST") in methods
+    delete_call = next(c for c in calls if c[1:3] == ["api", "DELETE"])
+    assert "batch_delete" in delete_call[3]
+
+
+def test_lark_im_set_announcement_skips_delete_when_empty():
+    calls = []
+
+    def fake_run(args, **kwargs):
+        calls.append(args)
+        m = MagicMock()
+        m.stdout = json.dumps({"data": {"items": []}}) if args[1:3] == ["api", "GET"] else "{}"
+        return m
+
+    with patch("subprocess.run", side_effect=fake_run):
+        LarkIM().set_announcement("oc_xxx", "状态更新")
+
+    methods = [(c[1], c[2]) for c in calls]
+    assert ("api", "DELETE") not in methods
+    assert ("api", "POST") in methods

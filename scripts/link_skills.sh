@@ -9,10 +9,17 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SKILLS_ROOT="$REPO_ROOT/skills"
 
-TARGET_DIRS=(
-  "$HOME/.claude/skills"
-  "$HOME/.openclaw/skills"
-)
+# Only target a host whose top-level config dir already exists — a user may
+# only have one of Claude Code / OpenClaw installed, and we shouldn't create
+# a stray ~/.claude or ~/.openclaw tree implying the other is configured too.
+TARGET_DIRS=()
+[[ -d "$HOME/.claude" ]] && TARGET_DIRS+=("$HOME/.claude/skills")
+[[ -d "$HOME/.openclaw" ]] && TARGET_DIRS+=("$HOME/.openclaw/skills")
+
+if [[ ${#TARGET_DIRS[@]} -eq 0 ]]; then
+  echo "Neither ~/.claude nor ~/.openclaw exists — install Claude Code or OpenClaw first." >&2
+  exit 1
+fi
 
 link_one() {
   local src="$1" target_dir="$2" name
