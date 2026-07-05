@@ -28,7 +28,7 @@ flowchart TB
   subgraph Lark[飞书生态]
     Chat[一案一群<br/>运行时容器]
     Doc[案件主文档<br/>真相源]
-    Base[专利总台账<br/>多维表格]
+    Base[专利流程管理<br/>多维表格]
     Mail[飞书邮件<br/>外部代理所]
   end
 
@@ -83,7 +83,7 @@ flowchart TB
 ```
 公司知识库 Wiki 空间：patent_flow                ← 本身即根节点，token 记为 $PATENT_FLOW_ROOT_TOKEN（= space_id）
      │
-     ├── 📊 专利总台账.bitable                ← 全局索引 + 状态看板
+     ├── 📊 专利流程管理.bitable                ← 全局索引 + 状态看板
      │      ├── 案件主表（主键：案号）
      │      ├── 事件流水（关联到主表）
      │      └── 待办/截止（过滤视图，仪表盘）
@@ -112,6 +112,8 @@ flowchart TB
 | 群 ID | 单行文本 | 一案一群的群唯一标识，反查入口 |
 | 案件文件夹 | 链接 | 云盘目录 |
 | 案件主文档 | 链接 | 案件在 wiki 里的节点本身，标题即「案号 - 案件名」，如 `2026017CNU - 电视挂架自适应卡扣` |
+| IPR | 人员（单选） | 负责该案的 IPR |
+| 研发 | 人员（多选） | 该案涉及的研发人员，可多人 |
 | 当前节点 | 单选 | S1/S2/.../S8/DONE/TERMINATED |
 | 当前子步骤 | 单行文本 | S6.2 等待 PM 决策 |
 | 状态 | 单选 | running / waiting_human / blocked / done |
@@ -447,7 +449,7 @@ patent_flow/                          ← 一个 git 仓库（即本项目根目
 | 群文件管理 | `lark-cli im +file-upload` + `lark-cli drive +file-move` |
 | 多维表格读写 | `lark-cli base +record-create / +record-update / +query` |
 
-> `$PATENT_FLOW_ROOT_TOKEN` 只需在知识库里手动建一次 `patent_flow/` 根节点（含 `专利总台账.bitable`、`templates/`、`cases/` 三个子节点）后取一次 token，后续所有案件文件夹、模板、台账都挂在这一个 token 下面，不再新建平行的顶层资源。
+> `$PATENT_FLOW_ROOT_TOKEN` 只需在知识库里手动建一次 `patent_flow/` 根节点（含 `专利流程管理.bitable`、`templates/`、`cases/` 三个子节点）后取一次 token，后续所有案件文件夹、模板、台账都挂在这一个 token 下面，不再新建平行的顶层资源。
 
 ### 9.2 一案一群初始化脚本
 
@@ -616,7 +618,7 @@ Agent: [apply_patch] [run_tests → 12 passed]
 
 ## 十四、一句话总结
 
-> **OpenClaw 当机器人壳子 + 飞书官方插件做通信层 + Lark CLI 做飞书操作基础设施 + 自写 patent-flow-skill 做业务大脑；存储统一收拢在公司知识库 `patent_flow/` 根目录下：`专利总台账`多维表格做索引、`cases/` 案件文件夹做归档、案件主文档做真相源；每个案件起一个飞书群作为运行时容器，群 ID ↔ 案号 一一映射，所有交互闭环在群里完成；Agent 唤醒时先读主文档解析状态块、灌进 prompt，决策后用 transition() 一次性同步主文档+台账+群公告+群名+播报；同一份 Skill 包通过 git 双分支在 Claude/Codex/OpenClaw 三端共用，配合 meta 自省工具让 Agent 在对话中安全地改自己。**
+> **OpenClaw 当机器人壳子 + 飞书官方插件做通信层 + Lark CLI 做飞书操作基础设施 + 自写 patent-flow-skill 做业务大脑；存储统一收拢在公司知识库 `patent_flow/` 根目录下：`专利流程管理`多维表格做索引、`cases/` 案件文件夹做归档、案件主文档做真相源；每个案件起一个飞书群作为运行时容器，群 ID ↔ 案号 一一映射，所有交互闭环在群里完成；Agent 唤醒时先读主文档解析状态块、灌进 prompt，决策后用 transition() 一次性同步主文档+台账+群公告+群名+播报；同一份 Skill 包通过 git 双分支在 Claude/Codex/OpenClaw 三端共用，配合 meta 自省工具让 Agent 在对话中安全地改自己。**
 
 ---
 

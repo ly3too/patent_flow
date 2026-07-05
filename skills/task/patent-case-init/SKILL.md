@@ -31,7 +31,7 @@ Wiki 节点没有 `folder` obj_type（只有 `doc/sheet/bitable/mindnote/docx/fi
 
 ```
 $PATENT_FLOW_ROOT_TOKEN（patent_flow 这个 Wiki 空间本身）
-├── 专利总台账.bitable
+├── 专利流程管理.bitable
 ├── templates（docx 节点，仅当父节点占位）
 │    └── 案件主文档模板.docx（子节点）
 └── cases（docx 节点，仅当父节点占位）
@@ -43,7 +43,7 @@ $PATENT_FLOW_ROOT_TOKEN（patent_flow 这个 Wiki 空间本身）
 
 > 以下命令名已对照实际安装的 lark-cli（1.0.53）核实，与 design.md 9.2 节的伪代码不完全一致——那里的 `+folder-create`/`docs +copy`/`base +record-create`/`--announcement` 在真实 CLI 里都不存在或参数不同，下面是验证过的真实用法。
 
-1. 生成案号（`YYYY + 流水号 + 品线代码`，如 `2026017CNU`）
+1. 生成案号：`tools/new_case_no.sh`（即 `python -m patent_flow new-case-no`）——规则是 `YYYYMMDD + 5位随机大写字母`（如 `20260705ABCDE`），命令内部会查台账主表，撞号自动重试，不需要也不要自己在对话里手算或瞎编一个案号
 2. 确认/创建当年的父节点：若 `cases/<年份>` 节点已存在直接复用其 token；不存在则 `lark-cli wiki +node-create --parent-node-token "<cases节点token>" --obj-type docx --title "<年份>"`（`cases` 节点本身若不存在，先用 `--space-id "$PATENT_FLOW_ROOT_TOKEN"` 建一次，不要重复建）
 3. 建案件节点/主文档：
    - 有模板时：`lark-cli drive files copy --params '{"file_token":"<模板token>"}' --data '{"name":"<案号> - <案件名>","type":"docx","folder_token":"<临时Drive文件夹或直接父节点token>"}'` 复制出一份普通 Drive 文档，再 `lark-cli wiki +move --obj-type docx --obj-token <复制出的doc token> --target-space-id "$PATENT_FLOW_ROOT_TOKEN" --target-parent-token "<年份节点token>"` 迁入 wiki（`docs` 域没有 `+copy` shortcut，复制必须用 `drive files copy` 原生命令）
@@ -52,7 +52,7 @@ $PATENT_FLOW_ROOT_TOKEN（patent_flow 这个 Wiki 空间本身）
 4. `lark-cli im +chat-create --as user --name "[<案号>] <案件名> - S1挖掘" --bots "<bot_app_id>"` 建一案一群（`--as user` 才能一步邀请其他人类成员并让 bot 自动入群；仅用 `--as bot` 建群时，邀请其他人类成员需要"先建群带上当前用户、再用 user 身份补邀其他人"的两步流程）
 5. **群公告受限**：`im +chat-update` 只能改名字/描述，不支持 `--announcement`；原生 `PATCH /open-apis/im/v1/chats/:chat_id/announcement` 需要 `im:chat.announcement:read`/`write` scope——如果这两个 scope 还没在飞书开放平台后台给应用勾选，`auth login` 无论怎么重新授权都会报 `invalid or malformed scopes`（这是应用级权限缺失，不是用户没登录）。**当前替代方案**：发一条 `+messages-send --markdown` 状态消息，再用 `im pins create --data '{"message_id":"<刚发的消息id>"}'` 置顶，效果等价于设计里的"群公告"（design.md 6.2 本来也把 Pin 消息列为独立的群要素）。应用加上 announcement scope 后再切回真正的群公告。
 6. 通过 [patent-cli](../../tool/patent-cli/SKILL.md) 的 `append_event.sh`（内部是 `base +record-upsert`）写入首条事件
-7. 写入台账主表（`$PATENT_FLOW_ROOT_TOKEN/专利总台账.bitable`）：`lark-cli base +record-upsert --base-token <base_token> --table-id <案件主表id> --json '{"案号":...,"群ID":...,...}'`（没有 `+record-create`，不传 `--record-id` 的 `+record-upsert` 就是创建）。因为案件没有真正的"文件夹"，`案件文件夹` 和 `案件主文档` 两个字段目前都填同一个案件节点的 wiki URL。
+7. 写入台账主表（`$PATENT_FLOW_ROOT_TOKEN/专利流程管理.bitable`）：`lark-cli base +record-upsert --base-token <base_token> --table-id <案件主表id> --json '{"案号":...,"群ID":...,"IPR":[{"id":"<IPR的open_id>"}],"研发":[{"id":"<研发1的open_id>"},{"id":"<研发2的open_id>"}],...}'`（没有 `+record-create`，不传 `--record-id` 的 `+record-upsert` 就是创建）。因为案件没有真正的"文件夹"，`案件文件夹` 和 `案件主文档` 两个字段目前都填同一个案件节点的 wiki URL。`IPR`/`研发` 是人员字段，值是 `{"id": open_id}` 对象数组（`研发` 允许多个），不知道 open_id 时先 `lark-cli contact +search-user --query "<姓名>" --as user` 查一遍，不要瞎猜。
 
 ## 完成后
 

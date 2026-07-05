@@ -111,9 +111,9 @@ def test_s4_rejects_bad_case_no():
 
 
 def test_s4_auto_advances_to_s5():
-    result = s4_filing.run({"案号": "2026017CNU", "案件名": "电视挂架自适应卡扣"})
+    result = s4_filing.run({"案号": "20260117ABCDE", "案件名": "电视挂架自适应卡扣"})
     assert result.to_node == "S5_review"
-    assert "案号：2026017CNU" in result.extra["filing_email_draft"]
+    assert "案号：20260117ABCDE" in result.extra["filing_email_draft"]
 
 
 # --- S5 review ---------------------------------------------------------------

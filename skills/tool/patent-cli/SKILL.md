@@ -12,6 +12,7 @@ metadata:
     - LEDGER_EVENTS_TABLE
   tools:
     - ../../../tools/load_case.sh
+    - ../../../tools/new_case_no.sh
     - ../../../tools/run_node.sh
     - ../../../tools/transition.sh
     - ../../../tools/append_event.sh
@@ -31,10 +32,11 @@ metadata:
 
 | 命令 | 用途 | 对应实现 |
 |---|---|---|
-| `tools/load_case.sh <案号>` | 读取案件主表记录 | `lark-cli base +query` |
+| `tools/load_case.sh <案号>` | 读取案件主表记录 | `lark-cli base +record-list --filter-json` |
+| `tools/new_case_no.sh` | 生成一个不撞号的新案号：`YYYYMMDD + 5位随机大写字母`，内部查台账重试直到唯一 | `patent_flow.case_no.generate_case_no()` |
 | `tools/run_node.sh <案号> <inputs_json>` | **派发当前节点的业务判断**：调用 `patent_flow/registry.py` 找到当前节点 handler，传入结构化输入（三要素草稿、IPR 判定等），拿到 `NodeResult` 后自动 `transition()`（若有合法 `to_node`） | `patent_flow.workflow.dispatch()` + `apply_result()` |
 | `tools/transition.sh <案号> <目标节点> <依据>` | 不经节点 handler、直接指定目标节点做状态跳转（用于人工纠错或跳过节点判断的场景），仍受状态机守卫校验 | `patent_flow.workflow.apply_result()` |
-| `tools/append_event.sh <案号> <来源> <事件类型> <摘要>` | 写事件流水（append-only） | `lark-cli base +record-create` |
+| `tools/append_event.sh <案号> <来源> <事件类型> <摘要>` | 写事件流水（append-only） | `lark-cli base +record-upsert` |
 | `tools/scan_deadlines.sh` | 扫描 S6/S8 两个 cron 驱动节点，返回今天命中提醒档位的案件 | `patent_flow.workflow.scan_deadlines()` |
 
 > `transition.sh` / `run_node.sh` 的 `--chat-id` / `--doc-token` / `--state-block-id` / `--case-title` 均为可选：不传时自动取案件记录里的 `群ID` / `案件主文档` 字段（`--state-block-id` 默认 `agent_state`，`--case-title` 默认案号）。多数场景应优先用 `run_node.sh`——业务判断和状态跳转在一次调用里原子完成；`transition.sh` 仅用于绕过节点 handler 的例外情况。

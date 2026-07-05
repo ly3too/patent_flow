@@ -40,8 +40,11 @@ $PYTHON -m pytest
 # Run a single test file
 $PYTHON -m pytest tests/test_state_machine.py
 
+# Generate a new case number (YYYYMMDD + 5 random letters, retried on collision)
+$PYTHON -m patent_flow new-case-no
+
 # Dispatch a node handler by hand (dry run against real Feishu env)
-$PYTHON -m patent_flow run-node 2026017CNU --inputs '{"ipr_verdict": "有新创性"}'
+$PYTHON -m patent_flow run-node 20260705ABCDE --inputs '{"ipr_verdict": "有新创性"}'
 
 # Scan the two cron-driven nodes (S6/S8) for today's reminders
 $PYTHON -m patent_flow scan-deadlines
@@ -74,6 +77,10 @@ Nodes: `S1_mining → S2_search → S3_disclosure → S4_filing → S5_review �
 
 `patent_flow/registry.py` maps state names to their handler's `run`. `patent_flow/workflow.py` is the orchestrator: `identify_case()` (chat_id → 案号), `dispatch()` (routes to the registry, then re-validates any proposed `to_node` against the state machine before anything downstream runs), `apply_result()` (only calls `transition()` when `to_node` is set), and `scan_deadlines()` (the S6/S8 cron entry point — iterates every case on those two nodes and dispatches with no `pm_decision`, so each handler only returns a reminder or stays silent).
 
+### Case Numbers (`patent_flow/case_no.py`)
+
+Scheme: `YYYYMMDD` + 5 random uppercase letters (e.g. `20260705ABCDE`), validated by `is_valid_case_no()` (used by `nodes/s4_filing.py` to sanity-check the format before filing) and produced by `generate_case_no(store)`, which retries against the live ledger on collision rather than trusting randomness alone. Exposed as `python -m patent_flow new-case-no` / `tools/new_case_no.sh` — `patent-case-init` calls this instead of having the LLM hand-generate a number.
+
 ### Storage Topology
 
 Everything except the group chat lives inside one Feishu Wiki space: `patent_flow` itself is the root (`$PATENT_FLOW_ROOT_TOKEN` = that space's `space_id`), not a node nested under some other space. Nothing patent-related should be created as a parallel top-level resource outside this space, and — this was a real bug found during the first live case-init run — nothing should end up in anyone's personal Drive ("我的空间") either; every write needs an explicit wiki space/parent-node target.
@@ -82,7 +89,7 @@ Everything except the group chat lives inside one Feishu Wiki space: `patent_flo
 
 ```
 patent_flow (Wiki space, IS the root — $PATENT_FLOW_ROOT_TOKEN = space_id)
-├── 专利总台账.bitable          ← global index + status board (3 tables: 案件主表, 事件流水, 待办截止)
+├── 专利流程管理.bitable          ← global index + status board (3 tables: 案件主表, 事件流水, 待办截止)
 ├── templates (docx node, parent-only placeholder)
 │    └── 案件主文档模板.docx (child node)
 └── cases (docx node, parent-only placeholder)

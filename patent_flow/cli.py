@@ -7,6 +7,7 @@ from dataclasses import asdict
 from datetime import date
 
 from . import workflow
+from .case_no import generate_case_no
 from .nodes.base import NodeResult
 from .registry import NODE_REGISTRY
 from .store import BitableStore
@@ -19,6 +20,8 @@ def main() -> None:
     sub = parser.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("status", help="Show how many active cases sit on each node")
+
+    sub.add_parser("new-case-no", help="Generate a unique case number (YYYYMMDD + 5 random letters)")
 
     p_transition = sub.add_parser("transition", help="Advance a case to the next node")
     p_transition.add_argument("case_no")
@@ -40,6 +43,8 @@ def main() -> None:
 
     if args.cmd == "status":
         _cmd_status()
+    elif args.cmd == "new-case-no":
+        _cmd_new_case_no()
     elif args.cmd == "transition":
         _cmd_transition(args)
     elif args.cmd == "run-node":
@@ -73,6 +78,10 @@ def _store() -> BitableStore:
         main_table_id=os.environ["LEDGER_MAIN_TABLE"],
         events_table_id=os.environ["LEDGER_EVENTS_TABLE"],
     )
+
+
+def _cmd_new_case_no() -> None:
+    print(generate_case_no(_store()))
 
 
 def _cmd_status() -> None:
